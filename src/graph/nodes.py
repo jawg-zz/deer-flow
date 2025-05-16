@@ -134,14 +134,16 @@ def planner_node(
         new_plan = Plan.model_validate(curr_plan)
         return Command(
             update={
-                "messages": [AIMessage(content=full_response, name="planner")],
+                "messages": [
+                    AIMessage(content=full_response, name="planner").model_dump()
+                ],
                 "current_plan": new_plan,
             },
             goto="reporter",
         )
     return Command(
         update={
-            "messages": [AIMessage(content=full_response, name="planner")],
+            "messages": [AIMessage(content=full_response, name="planner").model_dump()],
             "current_plan": full_response,
         },
         goto="human_feedback",
@@ -162,7 +164,7 @@ def human_feedback_node(
             return Command(
                 update={
                     "messages": [
-                        HumanMessage(content=feedback, name="feedback"),
+                        HumanMessage(content=feedback, name="feedback").model_dump(),
                     ],
                 },
                 goto="planner",
@@ -250,7 +252,7 @@ def reporter_node(state: State):
         "messages": [
             HumanMessage(
                 f"# Research Requirements\n\n## Task\n\n{current_plan.title}\n\n## Description\n\n{current_plan.thought}"
-            )
+            ).model_dump()
         ],
         "locale": state.get("locale", "en-US"),
     }
@@ -262,7 +264,7 @@ def reporter_node(state: State):
         HumanMessage(
             content="IMPORTANT: Structure your report according to the format in the prompt. Remember to include:\n\n1. Key Points - A bulleted list of the most important findings\n2. Overview - A brief introduction to the topic\n3. Detailed Analysis - Organized into logical sections\n4. Survey Note (optional) - For more comprehensive reports\n5. Key Citations - List all references at the end\n\nFor citations, DO NOT include inline citations in the text. Instead, place all citations in the 'Key Citations' section at the end using the format: `- [Source Title](URL)`. Include an empty line between each citation for better readability.\n\nPRIORITIZE USING MARKDOWN TABLES for data presentation and comparison. Use tables whenever presenting comparative data, statistics, features, or options. Structure tables with clear headers and aligned columns. Example table format:\n\n| Feature | Description | Pros | Cons |\n|---------|-------------|------|------|\n| Feature 1 | Description 1 | Pros 1 | Cons 1 |\n| Feature 2 | Description 2 | Pros 2 | Cons 2 |",
             name="system",
-        )
+        ).model_dump()
     )
 
     for observation in observations:
@@ -270,7 +272,7 @@ def reporter_node(state: State):
             HumanMessage(
                 content=f"Below are some observations for the research task:\n\n{observation}",
                 name="observation",
-            )
+            ).model_dump()
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
@@ -308,18 +310,35 @@ async def _execute_agent_step(
     observations = state.get("observations", [])
 
     # Find the first unexecuted step
+    current_step = None
+    completed_steps = []
     for step in current_plan.steps:
         if not step.execution_res:
+            current_step = step
             break
+        else:
+            completed_steps.append(step)
 
-    logger.info(f"Executing step: {step.title}")
+    if not current_step:
+        logger.warning("No unexecuted step found")
+        return Command(goto="research_team")
 
-    # Prepare the input for the agent
+    logger.info(f"Executing step: {current_step.title}")
+
+    # Format completed steps information
+    completed_steps_info = ""
+    if completed_steps:
+        completed_steps_info = "# Existing Research Findings\n\n"
+        for i, step in enumerate(completed_steps):
+            completed_steps_info += f"## Existing Finding {i+1}: {step.title}\n\n"
+            completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
+
+    # Prepare the input for the agent with completed steps info
     agent_input = {
         "messages": [
             HumanMessage(
-                content=f"#Task\n\n##title\n\n{step.title}\n\n##description\n\n{step.description}\n\n##locale\n\n{state.get('locale', 'en-US')}"
-            )
+                content=f"{completed_steps_info}# Current Task\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
+            ).model_dump()
         ]
     }
 
@@ -329,7 +348,7 @@ async def _execute_agent_step(
             HumanMessage(
                 content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
                 name="system",
-            )
+            ).model_dump()
         )
 
     # Invoke the agent
@@ -340,8 +359,8 @@ async def _execute_agent_step(
     logger.debug(f"{agent_name.capitalize()} full response: {response_content}")
 
     # Update the step with the execution result
-    step.execution_res = response_content
-    logger.info(f"Step '{step.title}' execution completed by {agent_name}")
+    current_step.execution_res = response_content
+    logger.info(f"Step '{current_step.title}' execution completed by {agent_name}")
 
     return Command(
         update={
@@ -349,7 +368,7 @@ async def _execute_agent_step(
                 HumanMessage(
                     content=response_content,
                     name=agent_name,
-                )
+                ).model_dump(),
             ],
             "observations": observations + [response_content],
         },

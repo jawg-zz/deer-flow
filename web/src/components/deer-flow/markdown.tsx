@@ -18,19 +18,7 @@ import { cn } from "~/lib/utils";
 
 import Image from "./image";
 import { Tooltip } from "./tooltip";
-
-const components: ReactMarkdownOptions["components"] = {
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  ),
-  img: ({ src, alt }) => (
-    <a href={src as string} target="_blank" rel="noopener noreferrer">
-      <Image className="rounded" src={src as string} alt={alt ?? ""} />
-    </a>
-  ),
-};
+import { Link } from "./link";
 
 export function Markdown({
   className,
@@ -38,13 +26,30 @@ export function Markdown({
   style,
   enableCopy,
   animated = false,
+  checkLinkCredibility = false,
   ...props
 }: ReactMarkdownOptions & {
   className?: string;
   enableCopy?: boolean;
   style?: React.CSSProperties;
   animated?: boolean;
+  checkLinkCredibility?: boolean;
 }) {
+  const components: ReactMarkdownOptions["components"] = useMemo(() => {
+    return {
+      a: ({ href, children }) => (
+        <Link href={href} checkLinkCredibility={checkLinkCredibility}>
+          {children}
+        </Link>
+      ),
+      img: ({ src, alt }) => (
+        <a href={src as string} target="_blank" rel="noopener noreferrer">
+          <Image className="rounded" src={src as string} alt={alt ?? ""} />
+        </a>
+      ),
+    };
+  }, [checkLinkCredibility]);
+
   const rehypePlugins = useMemo(() => {
     if (animated) {
       return [rehypeKatex, rehypeSplitWordsIntoSpans];
@@ -52,13 +57,7 @@ export function Markdown({
     return [rehypeKatex];
   }, [animated]);
   return (
-    <div
-      className={cn(
-        className,
-        "prose dark:prose-invert prose-p:my-0 prose-img:mt-0 flex flex-col gap-4",
-      )}
-      style={style}
-    >
+    <div className={cn(className, "prose dark:prose-invert")} style={style}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={rehypePlugins}
