@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from langchain_core.messages import AIMessageChunk, ToolMessage
+from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
 from langgraph.types import Command
 
 from src.graph.builder import build_graph_with_memory
@@ -61,6 +61,7 @@ async def chat_stream(request: ChatRequest):
             thread_id,
             request.max_plan_iterations,
             request.max_step_num,
+            request.max_search_results,
             request.auto_accepted_plan,
             request.interrupt_feedback,
             request.mcp_settings,
@@ -75,6 +76,7 @@ async def _astream_workflow_generator(
     thread_id: str,
     max_plan_iterations: int,
     max_step_num: int,
+    max_search_results: int,
     auto_accepted_plan: bool,
     interrupt_feedback: str,
     mcp_settings: dict,
@@ -101,6 +103,7 @@ async def _astream_workflow_generator(
             "thread_id": thread_id,
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
+            "max_search_results": max_search_results,
             "mcp_settings": mcp_settings,
         },
         stream_mode=["messages", "updates"],
@@ -124,7 +127,7 @@ async def _astream_workflow_generator(
                 )
             continue
         message_chunk, message_metadata = cast(
-            tuple[AIMessageChunk, dict[str, any]], event_data
+            tuple[BaseMessage, dict[str, any]], event_data
         )
         event_stream_message: dict[str, any] = {
             "thread_id": thread_id,
@@ -141,7 +144,7 @@ async def _astream_workflow_generator(
             # Tool Message - Return the result of the tool call
             event_stream_message["tool_call_id"] = message_chunk.tool_call_id
             yield _make_event("tool_call_result", event_stream_message)
-        else:
+        elif isinstance(message_chunk, AIMessageChunk):
             # AI Message - Raw message tokens
             if message_chunk.tool_calls:
                 # AI Message - Tool Call
