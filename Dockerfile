@@ -16,7 +16,7 @@ COPY . .
 
 # Install any application-specific dependencies if needed (skip if already done above).
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked
+    uv sync
 
 # Let Docker and Coolify know which port to expose.
 EXPOSE 8000
