@@ -3,9 +3,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { env } from "~/env";
+
 import { useReplay } from "../replay";
 
 import { fetchReplayTitle } from "./chat";
+import { getConfig } from "./config";
 
 export function useReplayMetadata() {
   const { isReplay } = useReplay();
@@ -38,4 +41,20 @@ export function useReplayMetadata() {
       });
   }, [isLoading, isReplay, title]);
   return { title, isLoading, hasError: error };
+}
+
+export function useRAGProvider() {
+  const [loading, setLoading] = useState(true);
+  const [provider, setProvider] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY) {
+      setLoading(false);
+      return;
+    }
+    setProvider(getConfig().rag.provider);
+    setLoading(false);
+  }, []);
+
+  return { provider, loading };
 }
