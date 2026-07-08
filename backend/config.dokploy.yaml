@@ -1,5 +1,4 @@
 # DeerFlow default config for Dokploy deployments
-# NOTE: API keys use hardcoded env var names - resolve before use
 config_version: 19
 log_level: info
 token_usage:
@@ -22,7 +21,5 @@ skills:
   enabled: true
   paths:
     - /app/skills
-sandbox:
-  enabled: false
 suggestions:
   enabled: false
