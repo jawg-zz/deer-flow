@@ -17,6 +17,9 @@ gateway:
 database:
   backend: sqlite
   path: /app/backend/.deer-flow/deerflow.db
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  enabled: false
 skills:
   enabled: true
   paths:
