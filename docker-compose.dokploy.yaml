@@ -18,7 +18,7 @@ services:
     image: nginx:alpine
     container_name: deer-flow-nginx
     ports:
-      - "${PORT:-2026}:2026"
+      - "2026:2026"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
     command: >
@@ -41,7 +41,7 @@ services:
         PNPM_STORE_PATH: /root/.local/share/pnpm/store
     container_name: deer-flow-frontend
     environment:
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_SECRET=b1158c3303aebc56677ea952bf0ea71a1c6f36e4f6e6a7e0b0a1c2d3e4f5a6b7
       - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
     networks:
       - deer-flow
@@ -60,8 +60,8 @@ services:
       - deer-flow-data:/app/backend/.deer-flow
     working_dir: /app
     environment:
-      - DEER_FLOW_INTERNAL_AUTH_TOKEN=${DEER_FLOW_INTERNAL_AUTH_TOKEN}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEER_FLOW_INTERNAL_AUTH_TOKEN=Dq4v8Zx2Lp9mN6kR3tW7yH5jF1cB0sA
+      - OPENAI_API_KEY=sk-b1158c3303aebc56677ea952bf0ea71a
       - DEER_FLOW_STREAM_BRIDGE_REDIS_URL=redis://redis:6379/0
       - DEER_FLOW_CHANNELS_LANGGRAPH_URL=http://gateway:8001/api
       - DEER_FLOW_CHANNELS_GATEWAY_URL=http://gateway:8001
