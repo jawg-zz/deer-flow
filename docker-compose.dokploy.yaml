@@ -37,7 +37,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: prod
       args:
-        CACHE_BUST: 1783506018
+        CACHE_BUST: 1783508082
         PNPM_STORE_PATH: /root/.local/share/pnpm/store
     container_name: deer-flow-frontend
     environment:
@@ -52,8 +52,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       args:
-        CACHE_BUST: 1783506018
-        UV_EXTRAS: postgres
+        CACHE_BUST: 1783508082
     container_name: deer-flow-gateway
     command: sh -c "cd backend && if [ ! -f config.yaml ]; then cp config.dokploy.yaml config.yaml && echo 'Using default config'; fi && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001"
     volumes:
