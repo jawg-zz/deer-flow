@@ -1,0 +1,127 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: deer-flow-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: deer-flow-nginx
+    ports:
+      - "${PORT:-2026}:2026"
+    command: >
+      sh -c '
+        cat > /etc/nginx/nginx.conf << "NGINXEOF"
+events { worker_connections 1024; }
+pid /tmp/nginx.pid;
+http {
+  sendfile on; tcp_nopush on; tcp_nodelay on; keepalive_timeout 65;
+  types_hash_max_size 2048;
+  access_log /dev/stdout; error_log /dev/stderr;
+  resolver 127.0.0.11 valid=10s ipv6=off;
+  map $http_x_forwarded_proto $forwarded_proto {
+    default $scheme;
+    "~*^https" https;
+  }
+  server {
+    listen 2026 default_server;
+    listen [::]:2026 default_server;
+    server_name _;
+    set $gateway_upstream gateway:8001;
+    set $frontend_upstream frontend:3000;
+    proxy_buffering off; proxy_cache off;
+    location /api/langgraph/ {
+      rewrite ^/api/langgraph/(.*) /api/$1 break;
+      proxy_pass http://$gateway_upstream;
+      proxy_http_version 1.1;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $forwarded_proto;
+      proxy_set_header Connection "";
+      proxy_set_header X-Accel-Buffering no;
+      proxy_connect_timeout 600s; proxy_send_timeout 600s; proxy_read_timeout 600s;
+      chunked_transfer_encoding on;
+    }
+    location /api/ {
+      proxy_pass http://$gateway_upstream;
+      proxy_http_version 1.1;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $forwarded_proto;
+      client_max_body_size 100M;
+    }
+    location / {
+      proxy_pass http://$frontend_upstream;
+      proxy_http_version 1.1;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $forwarded_proto;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_cache_bypass $http_upgrade;
+      proxy_connect_timeout 600s; proxy_send_timeout 600s; proxy_read_timeout 600s;
+    }
+  }
+}
+NGINXEOF
+        nginx -g "daemon off;"
+      '
+    depends_on:
+      - frontend
+      - gateway
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/jawg-zz/deer-flow-frontend:v0.1.0-deploy
+    container_name: deer-flow-frontend
+    environment:
+      - BETTER_AUTH_SECRET=***      - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  gateway:
+    image: ghcr.io/jawg-zz/deer-flow-backend:v0.1.0-deploy
+    container_name: deer-flow-gateway
+    command: sh -c "cd backend && if [ ! -f config.yaml ]; then cp config.dokploy.yaml config.yaml && echo 'Using default config'; fi && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-1}"
+    volumes:
+      - deer-flow-data:/app/backend/.deer-flow
+    working_dir: /app
+    environment:
+      - CI=true
+      - DEER_FLOW_PROJECT_ROOT=/app
+      - DEER_FLOW_HOME=/app/backend/.deer-flow
+      - DEER_FLOW_STREAM_BRIDGE_REDIS_URL=***      - DEER_FLOW_CHANNELS_LANGGRAPH_URL=http://gateway:8001/api
+      - DEER_FLOW_CHANNELS_GATEWAY_URL=http://gateway:8001
+      - DEER_FLOW_INTERNAL_AUTH_TOKEN=***      - NO_PROXY=***      - no_proxy=***
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  deer-flow-data:
+
+networks:
+  deer-flow:
+    driver: bridge

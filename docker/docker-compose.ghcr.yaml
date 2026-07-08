@@ -20,7 +20,7 @@ services:
     ports:
       - "${PORT:-2026}:2026"
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
     command: >
       sh -c "cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf
       && nginx -g 'daemon off;'"
@@ -32,10 +32,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      target: prod
+    image: ghcr.io/jawg-zz/deer-flow-frontend:v0.1.0-deploy
     container_name: deer-flow-frontend
     environment:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
@@ -45,25 +42,24 @@ services:
     restart: unless-stopped
 
   gateway:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: ghcr.io/jawg-zz/deer-flow-backend:v0.1.0-deploy
     container_name: deer-flow-gateway
-    command: sh -c "cd backend && if [ ! -f config.yaml ]; then cp config.dokploy.yaml config.yaml && echo 'Using default config'; fi && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001"
+    command: sh -c "cd backend && if [ ! -f config.yaml ]; then cp config.dokploy.yaml config.yaml && echo 'Using default config'; fi && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-1}"
     volumes:
-      - ./skills:/app/skills:ro
+      - ../skills:/app/skills:ro
       - deer-flow-data:/app/backend/.deer-flow
     working_dir: /app
     environment:
-      - DEER_FLOW_INTERNAL_AUTH_TOKEN=${DEER_FLOW_INTERNAL_AUTH_TOKEN}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEER_FLOW_STREAM_BRIDGE_REDIS_URL=redis://redis:6379/0
-      - DEER_FLOW_CHANNELS_LANGGRAPH_URL=http://gateway:8001/api
-      - DEER_FLOW_CHANNELS_GATEWAY_URL=http://gateway:8001
       - CI=true
       - DEER_FLOW_PROJECT_ROOT=/app
       - DEER_FLOW_HOME=/app/backend/.deer-flow
       - DEER_FLOW_SKILLS_PATH=/app/skills
+      - DEER_FLOW_STREAM_BRIDGE_REDIS_URL=${DEER_FLOW_STREAM_BRIDGE_REDIS_URL:-redis://redis:6379/0}
+      - DEER_FLOW_CHANNELS_LANGGRAPH_URL=${DEER_FLOW_CHANNELS_LANGGRAPH_URL:-http://gateway:8001/api}
+      - DEER_FLOW_CHANNELS_GATEWAY_URL=${DEER_FLOW_CHANNELS_GATEWAY_URL:-http://gateway:8001}
+      - DEER_FLOW_INTERNAL_AUTH_TOKEN=${DEER_FLOW_INTERNAL_AUTH_TOKEN}
+      - NO_PROXY=${NO_PROXY:-}${NO_PROXY:+,}localhost,127.0.0.1,::1,gateway,frontend,nginx,provisioner,host.docker.internal
+      - no_proxy=${no_proxy:-}${no_proxy:+,}localhost,127.0.0.1,::1,gateway,frontend,nginx,provisioner,host.docker.internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

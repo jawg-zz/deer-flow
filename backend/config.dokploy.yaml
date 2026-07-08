@@ -1,5 +1,5 @@
 # DeerFlow default config for Dokploy deployments
-# Auto-loaded if no config.yaml is mounted at /app/backend/config.yaml
+# NOTE: API keys use hardcoded env var names - resolve before use
 config_version: 19
 log_level: info
 token_usage:
@@ -9,7 +9,7 @@ models:
     display_name: Default
     use: langchain_openai:ChatOpenAI
     model: gpt-4o-mini
-    api_key: $OPENAI_API_KEY
+    api_key: not-set-replace-with-real-key
     request_timeout: 600.0
     supports_vision: true
 gateway:
