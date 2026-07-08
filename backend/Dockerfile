@@ -43,6 +43,7 @@ COPY --from=uv-source /uv /uvx /usr/local/bin/
 WORKDIR /app
 
 # Copy backend source code
+ARG CACHE_BUST
 COPY backend ./backend
 
 # Install dependencies with cache mount

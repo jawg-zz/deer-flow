@@ -21,6 +21,7 @@ RUN pnpm config set store-dir ${PNPM_STORE_PATH}
 # Optionally override npm registry for restricted networks (e.g. NPM_REGISTRY=https://registry.npmmirror.com)
 RUN if [ -n "${NPM_REGISTRY}" ]; then pnpm config set registry "${NPM_REGISTRY}"; fi
 WORKDIR /app
+ARG CACHE_BUST
 COPY frontend ./frontend
 
 # ── Dev: install only, CMD is overridden by docker-compose ───────────────────
