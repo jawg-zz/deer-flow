@@ -1,0 +1,28 @@
+# DeerFlow default config for Dokploy deployments
+# Auto-loaded if no config.yaml is mounted at /app/backend/config.yaml
+config_version: 19
+log_level: info
+token_usage:
+  enabled: true
+models:
+  - name: default
+    display_name: Default
+    use: langchain_openai:ChatOpenAI
+    model: gpt-4o-mini
+    api_key: $OPENAI_API_KEY
+    request_timeout: 600.0
+    supports_vision: true
+gateway:
+  enable_docs: true
+  cors_origins: "*"
+database:
+  backend: sqlite
+  path: /app/backend/.deer-flow/deerflow.db
+skills:
+  enabled: true
+  paths:
+    - /app/skills
+sandbox:
+  enabled: false
+suggestions:
+  enabled: false
